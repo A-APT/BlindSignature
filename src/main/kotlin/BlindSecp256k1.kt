@@ -1,5 +1,7 @@
 class BlindSecp256k1 {
 
+    val curve = EllipticCurve()
+
     fun newRequestParameters() {}
 
     fun blind() {}
