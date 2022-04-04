@@ -111,4 +111,19 @@ class EllipticCurve( // init parameters with Recommended Parameters secp256k1
         return Pair(Point(x3, y3), z3)
     }
 
+    // calculate kG = G + G + ... + G (k times)
+    fun mul(k: BigInteger): Point {
+        return mul(k, Point(Gx, Gy))
+    }
+
+    fun mul(k: BigInteger, point: Point): Point {
+        var a: BigInteger = k
+        var result: Point = point
+        while (a > BigInteger.ONE) {
+            result = add(result, point)
+            a -= BigInteger.ONE
+        }
+        return result
+    }
+
 }

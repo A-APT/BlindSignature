@@ -27,4 +27,23 @@ class EllipticCurveTest {
         assertEquals(true, curve.isOnCurve(G3))
     }
 
+    @Test
+    fun is_mul_works_ok_on_3G() {
+        val G2 = curve.add(G, G) // 2G=G+G
+        val G3 = curve.add(G, G2) // 3G=G+G+G
+        val result = curve.mul(BigInteger.valueOf(3)) // 3G
+        assertEquals(G3.x, result.x)
+        assertEquals(G3.y, result.y)
+    }
+
+    @Test
+    fun is_mul_works_ok_on_4G() {
+        val G2 = curve.add(G, G) // 2G=G+G
+        val G3 = curve.add(G, G2) // 3G=G+G+G
+        val G4 = curve.add(G, G3) // 4G=G+G+G+G
+        val result = curve.mul(BigInteger.valueOf(4), G) // 4G
+        assertEquals(G4.x, result.x)
+        assertEquals(G4.y, result.y)
+    }
+
 }
