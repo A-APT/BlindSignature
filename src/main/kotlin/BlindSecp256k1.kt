@@ -59,5 +59,6 @@ fun main() {
     val sig: BigInteger             = blind.unblind(blindedData.a, blindedData.b, blindSig)
 
     val result: Boolean             = blind.verify(sig, blindedData.R, m)
+    println(result)
     assert(result)
 }

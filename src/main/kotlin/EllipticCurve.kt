@@ -117,11 +117,11 @@ class EllipticCurve( // init parameters with Recommended Parameters secp256k1
     }
 
     fun mul(k: BigInteger, point: Point): Point {
-        var a: BigInteger = k
-        var result: Point = point
-        while (a > BigInteger.ONE) {
-            result = add(result, point)
-            a -= BigInteger.ONE
+        val bigLength: Int = k.bitLength()
+        var result: Point = Point(BigInteger.ZERO, BigInteger.ZERO)
+        for (i in bigLength-1 downTo 0) {
+            result = add(result, result)
+            if (k.testBit(i)) result = add(result, point)
         }
         return result
     }
