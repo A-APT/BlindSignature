@@ -7,17 +7,19 @@ Blind Signature over `Secp256k1`, based on this paper
 ## How to
 Add it in your root build.gradle at the end of repositories:
 
-	allprojects {
+	allprojects {	// * not on buildscript
 		repositories {
 			...
-			maven { url 'https://jitpack.io' }
+			maven { url 'https://jitpack.io' } 		// for build.gradle
+			maven { url = uri("https://jitpack.io") } 	// for build.gradle.kts
 		}
 	}
 Step 2. Add the dependency
 
 	dependencies {
-	        implementation 'com.github.A-APT:BlindSignature:Tag'
+	        implementation 'com.github.A-APT:BlindSignature:Tag'	 // for build.gradle
+		implementation("com.github.A-APT:BlindSignature:Tag")	 // for build.gradle.kts
 	}
   
 ## Usage
-See *[test code](https://github.com/A-APT/BlindSignature/blob/32089320ee1dc6aa45df996c7f84f8d62a184a5a/src/test/kotlin/BlindSecp256k1Test.kt)* for usage
+See *[test code](https://github.com/A-APT/BlindSignature/blob/5e9816ef3405f35c407cb5bb0e0d486ec95fc6ea/src/test/kotlin/com/aapt/BlindSecp256k1Test.kt)* for usage
