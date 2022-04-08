@@ -5,6 +5,7 @@ import org.bouncycastle.math.ec.ECPoint
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.security.spec.ECFieldFp
+import java.security.spec.EllipticCurve
 
 data class KeyPair(val publicKey: ECPoint, val privateKey: BigInteger)
 data class BlindedData(val a: BigInteger, val b: BigInteger, val R: ECPoint, val blindM: BigInteger)
@@ -20,7 +21,7 @@ class BlindSecp256k1 {
     val Gx: BigInteger = BigInteger("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798", 16) // The base point G
     val Gy: BigInteger = BigInteger("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8", 16) // The order n of G
 
-    val ecCurve: ECCurve = EC5Util.convertCurve(java.security.spec.EllipticCurve(ECFieldFp(P), a, b))
+    val ecCurve: ECCurve = EC5Util.convertCurve(EllipticCurve(ECFieldFp(P), a, b))
     val random = SecureRandom()
     var multiplier: ECMultiplier = ecCurve.multiplier
     var G: ECPoint = ecCurve.createPoint(Gx, Gy)
