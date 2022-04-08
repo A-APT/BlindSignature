@@ -2,13 +2,12 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.4.10"
+    id("maven-publish")
 }
-
-group = "me.jieun"
-version = "1.0-SNAPSHOT"
 
 repositories {
     mavenCentral()
+    maven { url = uri("https://jitpack.io") }
 }
 
 dependencies {
@@ -24,4 +23,16 @@ tasks.test {
 
 tasks.withType<KotlinCompile>() {
     kotlinOptions.jvmTarget = "1.8"
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            groupId = "org.aapt"
+            artifactId = "blind-sig"
+            version = "1.0.0"
+
+            from(components["java"])
+        }
+    }
 }
