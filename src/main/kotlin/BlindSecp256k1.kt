@@ -5,6 +5,7 @@ import org.bouncycastle.math.ec.ECPoint
 import java.math.BigInteger
 import java.security.SecureRandom
 import java.security.spec.ECFieldFp
+import kotlin.math.absoluteValue
 
 data class KeyPair(val publicKey: ECPoint, val privateKey: BigInteger)
 data class BlindedData(val a: BigInteger, val b: BigInteger, val R: ECPoint, val blindM: BigInteger)
@@ -12,39 +13,52 @@ data class BlindedData(val a: BigInteger, val b: BigInteger, val R: ECPoint, val
 class BlindSecp256k1 {
 
     val curve = EllipticCurve()
+    var ecCurve: ECCurve
     val random = SecureRandom()
     var multiplier: ECMultiplier
     var G: ECPoint
 
     init {
         val c = java.security.spec.EllipticCurve(ECFieldFp(curve.P), curve.a, curve.b)
-        val ecCurve: ECCurve = EC5Util.convertCurve(c)
+        ecCurve = EC5Util.convertCurve(c)
         multiplier = ecCurve.multiplier
         G = ecCurve.createPoint(curve.Gx, curve.Gy)
     }
 
     fun generateKeyPair(): KeyPair {
-        val private = BigInteger.valueOf(random.nextLong()) // BigInteger(curve.N.bitLength(), random).mod(curve.N)
+        val private = BigInteger(curve.N.bitLength(), random).mod(curve.N)
         val public = multiplier.multiply(G, private) // curve.mul(private)
         return KeyPair(public, private)
     }
 
     fun newRequestParameters(): Pair<BigInteger, ECPoint> {
-        val k = BigInteger.valueOf(random.nextLong())
+        lateinit var k: BigInteger
+        do {
+            k = BigInteger(curve.N.bitLength(), random)
+        } while (k >= curve.N)
+        //val k = BigInteger(curve.N.bitLength(), random).mod(curve.N) //BigInteger.valueOf(random.nextLong().absoluteValue).mod(curve.N)
         val R_ = multiplier.multiply(G, k) // curve.mul(k)
         return Pair(k, R_) // R' = kG
     }
 
     fun blind(R_: ECPoint, m: BigInteger): BlindedData {
-        val a = BigInteger.valueOf(random.nextLong())
-        val b = BigInteger.valueOf(random.nextLong())
+        if (!curve.isOnCurve(Point(R_.normalize().xCoord.toBigInteger(), R_.normalize().yCoord.toBigInteger())))
+            throw error("R_ is not in curve")
+
+        val a = BigInteger.valueOf(random.nextLong().absoluteValue).mod(curve.N)
+        val b = BigInteger.valueOf(random.nextLong().absoluteValue).mod(curve.N)
         val R = multiplier.multiply(R_, a).add(multiplier.multiply(G, b)) // curve.add(curve.mul(a, R_), curve.mul(b)) // R=aR'+bG
+        if (!curve.isOnCurve(Point(R.normalize().xCoord.toBigInteger(), R.normalize().yCoord.toBigInteger())))
+            throw error("R is not in curve")
+
         val a_1 = a.modInverse(curve.N)
-        val blindM: BigInteger = (a_1 * R.normalize().xCoord.toBigInteger() * m).mod(curve.N) // TODO hash m
+        val blindM: BigInteger = (a_1 * R.normalize().xCoord.toBigInteger().mod(curve.N) * m).mod(curve.N) // TODO hash m
         return BlindedData(a, b, R, blindM)
     }
 
     fun blindSign(privateKey: BigInteger, k: BigInteger, blindM: BigInteger): BigInteger {
+        if (blindM.compareTo(curve.N) != -1) throw error("blinded message is not inside the finite field.")
+        if (blindM.signum() == 0) throw error("blinded message can not be 0.")
         return (privateKey * blindM + k).mod(curve.N) // s' = dm' + k
     }
 
@@ -52,9 +66,9 @@ class BlindSecp256k1 {
         return (a * blindSig + b).mod(curve.N) // s = as' + b
     }
 
-    fun verify(sig: BigInteger, R: ECPoint, m: BigInteger): Boolean {
+    fun verify(sig: BigInteger, R: ECPoint, m: BigInteger, publicKey: ECPoint): Boolean {
         val left = multiplier.multiply(G, sig) //curve.mul(sig) // sG
-        val right = R.add(multiplier.multiply(G, R.normalize().xCoord.toBigInteger() * m)) // TODO h(m) // R + xRh(m)G
+        val right = R.add(multiplier.multiply(publicKey, (R.normalize().xCoord.toBigInteger().mod(curve.N) * m).mod(curve.N))) // TODO h(m) // R + xRh(m)G
         return left.normalize().xCoord.toBigInteger() == right.normalize().xCoord.toBigInteger()
                 && left.normalize().yCoord.toBigInteger() == right.normalize().yCoord.toBigInteger()
     }
@@ -74,7 +88,7 @@ fun main() {
     val blindSig: BigInteger        = blind.blindSign(keyPair.privateKey, k, blindedData.blindM)
     val sig: BigInteger             = blind.unblind(blindedData.a, blindedData.b, blindSig)
 
-    val result: Boolean             = blind.verify(sig, blindedData.R, m)
+    val result: Boolean             = blind.verify(sig, blindedData.R, m, keyPair.publicKey)
     println(result)
     assert(result)
 }
