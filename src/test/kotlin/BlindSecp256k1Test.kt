@@ -7,7 +7,7 @@ class BlindSecp256k1Test {
     @Test
     fun is_blindsecp256k1_works_well() {
         val blind = BlindSecp256k1()
-        val m: BigInteger = BigInteger.valueOf(139248)
+        val m: ByteArray = "test".encodeToByteArray() // UTF-8
         val keyPair: KeyPair            = blind.generateKeyPair()
         val (k, R_)                     = blind.newRequestParameters()
 

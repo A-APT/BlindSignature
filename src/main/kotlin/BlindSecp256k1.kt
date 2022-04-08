@@ -1,4 +1,5 @@
 import org.bouncycastle.jcajce.provider.asymmetric.util.EC5Util
+import org.bouncycastle.jcajce.provider.digest.Keccak
 import org.bouncycastle.math.ec.ECCurve
 import org.bouncycastle.math.ec.ECMultiplier
 import org.bouncycastle.math.ec.ECPoint
@@ -46,7 +47,7 @@ class BlindSecp256k1 {
         return Pair(k, R_) // R' = kG
     }
 
-    fun blind(R_: ECPoint, m: BigInteger): BlindedData {
+    fun blind(R_: ECPoint, m: ByteArray): BlindedData {
         if (!R_.isValid) throw error("R_ is not in curve")
 
         val a = generateRandomNum()
@@ -54,7 +55,8 @@ class BlindSecp256k1 {
         val R = multiplier.multiply(R_, a).add(multiplier.multiply(G, b)) // curve.add(curve.mul(a, R_), curve.mul(b)) // R=aR'+bG
 
         val aInv = a.modInverse(N)
-        val blindM: BigInteger = (aInv * R.normalize().xCoord.toBigInteger().mod(N) * m).mod(N) // TODO hash m
+        val h: BigInteger = keccak256(m)
+        val blindM: BigInteger = (aInv * R.normalize().xCoord.toBigInteger().mod(N) * h).mod(N)
         return BlindedData(a, b, R, blindM)
     }
 
@@ -68,14 +70,22 @@ class BlindSecp256k1 {
         return (a * blindSig + b).mod(N) // s = as' + b
     }
 
-    fun verify(sig: BigInteger, R: ECPoint, m: BigInteger, publicKey: ECPoint): Boolean {
+    fun verify(sig: BigInteger, R: ECPoint, m: ByteArray, publicKey: ECPoint): Boolean {
         if (!R.isValid) throw error("R_ is not in curve")
         if (!publicKey.isValid) throw error("R_ is not in curve")
 
         val left = multiplier.multiply(G, sig) //curve.mul(sig) // sG
-        val right = R.add(multiplier.multiply(publicKey, (R.normalize().xCoord.toBigInteger().mod(N) * m).mod(N))) // TODO h(m) // R + xRh(m)G
+        val h: BigInteger = keccak256(m)
+        val right = R.add(multiplier.multiply(publicKey, (R.normalize().xCoord.toBigInteger().mod(N) * h).mod(N))) // TODO h(m) // R + xRh(m)G
         return left.normalize().xCoord.toBigInteger() == right.normalize().xCoord.toBigInteger()
                 && left.normalize().yCoord.toBigInteger() == right.normalize().yCoord.toBigInteger()
+    }
+
+    fun keccak256(m: ByteArray): BigInteger {
+        Keccak.Digest256().apply {
+            update(m)
+            return BigInteger(digest())
+        }
     }
 
 }
