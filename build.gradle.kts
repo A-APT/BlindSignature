@@ -30,7 +30,7 @@ publishing {
         create<MavenPublication>("maven") {
             groupId = "org.aapt"
             artifactId = "blind-sig"
-            version = "1.0.0"
+            version = "2.0.0"
 
             from(components["java"])
         }

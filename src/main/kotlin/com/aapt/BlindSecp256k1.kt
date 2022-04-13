@@ -8,8 +8,9 @@ import java.security.SecureRandom
 import java.security.spec.ECFieldFp
 import java.security.spec.EllipticCurve
 
-data class KeyPair(val publicKey: ECPoint, val privateKey: BigInteger)
-data class BlindedData(val a: BigInteger, val b: BigInteger, val R: ECPoint, val blindM: BigInteger)
+data class Point(val x: BigInteger, val y: BigInteger)
+data class KeyPair(val publicKey: Point, val privateKey: BigInteger)
+data class BlindedData(val a: BigInteger, val b: BigInteger, val R: Point, val blindM: BigInteger)
 
 class BlindSecp256k1 {
     // See SEC 2: Recommended Elliptic Curve Domain Parameters
@@ -24,7 +25,7 @@ class BlindSecp256k1 {
 
     val ecCurve: ECCurve = EC5Util.convertCurve(EllipticCurve(ECFieldFp(P), a, b))
     val random = SecureRandom()
-    var multiplier: ECMultiplier = ecCurve.multiplier
+    val multiplier: ECMultiplier = ecCurve.multiplier
     var G: ECPoint = ecCurve.createPoint(Gx, Gy)
 
     fun generateRandomNum(): BigInteger {
@@ -37,26 +38,29 @@ class BlindSecp256k1 {
 
     fun generateKeyPair(): KeyPair {
         val private: BigInteger = generateRandomNum()
-        val public = multiplier.multiply(G, private) // curve.mul(private)
+        val publicPoint = multiplier.multiply(G, private)
+        val public = Point(publicPoint.normalize().xCoord.toBigInteger(), publicPoint.normalize().yCoord.toBigInteger())
         return KeyPair(public, private)
     }
 
-    fun newRequestParameters(): Pair<BigInteger, ECPoint> {
+    fun newRequestParameters(): Pair<BigInteger, Point> {
         val k: BigInteger = generateRandomNum()
-        val R_ = multiplier.multiply(G, k) // curve.mul(k)
+        val R_Point: ECPoint = multiplier.multiply(G, k)
+        val R_: Point = Point(R_Point.normalize().xCoord.toBigInteger(), R_Point.normalize().yCoord.toBigInteger())
         return Pair(k, R_) // R' = kG
     }
 
-    fun blind(R_: ECPoint, m: ByteArray): BlindedData {
-        if (!R_.isValid) throw error("R_ is not in curve")
+    fun blind(R_: Point, m: ByteArray): BlindedData {
+        val R_Point: ECPoint = ecCurve.validatePoint(R_.x, R_.y)
 
-        val a = generateRandomNum()
-        val b = generateRandomNum()
-        val R = multiplier.multiply(R_, a).add(multiplier.multiply(G, b)) // curve.add(curve.mul(a, R_), curve.mul(b)) // R=aR'+bG
+        val a: BigInteger = generateRandomNum()
+        val b: BigInteger = generateRandomNum()
+        val RPoint = multiplier.multiply(R_Point, a).add(multiplier.multiply(G, b)) // R=aR'+bG
+        val R: Point = Point(RPoint.normalize().xCoord.toBigInteger(), RPoint.normalize().yCoord.toBigInteger())
 
         val aInv = a.modInverse(N)
         val h: BigInteger = keccak256(m)
-        val blindM: BigInteger = (aInv * R.normalize().xCoord.toBigInteger().mod(N) * h).mod(N)
+        val blindM: BigInteger = (aInv * R.x.mod(N) * h).mod(N)
         return BlindedData(a, b, R, blindM)
     }
 
@@ -70,13 +74,13 @@ class BlindSecp256k1 {
         return (a * blindSig + b).mod(N) // s = as' + b
     }
 
-    fun verify(sig: BigInteger, R: ECPoint, m: ByteArray, publicKey: ECPoint): Boolean {
-        if (!R.isValid) throw error("R_ is not in curve")
-        if (!publicKey.isValid) throw error("R_ is not in curve")
+    fun verify(sig: BigInteger, R: Point, m: ByteArray, publicKey: Point): Boolean {
+        val RPoint: ECPoint = ecCurve.validatePoint(R.x, R.y)
+        val pubkeyPoint: ECPoint = ecCurve.validatePoint(publicKey.x, publicKey.y)
 
-        val left = multiplier.multiply(G, sig) //curve.mul(sig) // sG
+        val left = multiplier.multiply(G, sig) // sG
         val h: BigInteger = keccak256(m)
-        val right = R.add(multiplier.multiply(publicKey, (R.normalize().xCoord.toBigInteger().mod(N) * h).mod(N))) // TODO h(m) // R + xRh(m)G
+        val right = RPoint.add(multiplier.multiply(pubkeyPoint, (R.x.mod(N) * h).mod(N))) // R + xRh(m)G
         return left.normalize().xCoord.toBigInteger() == right.normalize().xCoord.toBigInteger()
                 && left.normalize().yCoord.toBigInteger() == right.normalize().yCoord.toBigInteger()
     }
